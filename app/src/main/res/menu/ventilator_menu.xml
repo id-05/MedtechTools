@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/playDevice"
+        android:icon="@drawable/ic_baseline_play_arrow_24_off"
+        android:title="playDevice"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/pauseDevice"
+        android:icon="@drawable/ic_baseline_pause_24_off"
+        android:title="pauseDevice"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/ventiletorBluetooth"
+        android:icon="@drawable/ic_baseline_bluetooth_disabled_24"
+        android:title="@string/item"
+        app:showAsAction="always" />
+</menu>

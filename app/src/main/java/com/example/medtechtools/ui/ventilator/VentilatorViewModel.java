@@ -13,8 +13,6 @@ public class VentilatorViewModel extends ViewModel {
         mText.setValue("This is ventilator fragment");
     }
 
-
-
     public LiveData<String> getText() {
         return mText;
     }
