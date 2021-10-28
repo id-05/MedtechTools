@@ -7,8 +7,10 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.ParcelUuid;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -16,7 +18,12 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
+import android.widget.TextView;
 import androidx.annotation.NonNull;
+import androidx.appcompat.view.menu.ActionMenuItemView;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import com.example.medtechtools.R;
@@ -38,29 +45,42 @@ import lecho.lib.hellocharts.model.PointValue;
 import lecho.lib.hellocharts.model.Viewport;
 import lecho.lib.hellocharts.view.LineChartView;
 
+import static android.content.Context.MODE_PRIVATE;
+
 public class VentilatorFragment extends Fragment {
 
     private VentilatorViewModel ventilatorViewModel;
+    Animation animationRotate = null;
+    Animation animationStop = null;
     BluetoothDevice curDevice;
     private BluetoothDevice mmDevice;
     ConnectedThread mConnectedThread;
-    UUID MY_UUID_INSECURE = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb");
     static String TAG = "medtechtools";
     boolean bluetoothStatus = true;
     private Menu mOptionsMenu;
     LineChartView chart;
     List<PointValue> values = new ArrayList<>();
+    List<PointValue> valuesCursor = new ArrayList<>();
     LineChartData data;
     int i = 0;
     int j = 0;
     int amountOfPoints = 120;
     ArrayList<Byte> bufList = new ArrayList<>();
+    ActionMenuItemView imageSearchBluetooth;
+    UUID deviceUUID;
+    SharedPreferences sPref;
+    TextView statusString;
+    String visibleDevName;
 
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
         ventilatorViewModel =
                 new ViewModelProvider(this).get(VentilatorViewModel.class);
         View root = inflater.inflate(R.layout.fragment_ventilator, container, false);
+
+        statusString = root.findViewById(R.id.statusString);
+        loadText();
+        statusString.setText(visibleDevName);
 
         chart = root.findViewById(R.id.chart);
         chart.setInteractive(true);
@@ -76,11 +96,19 @@ public class VentilatorFragment extends Fragment {
         chart.setCurrentViewport(v);
         chart.setViewportCalculationEnabled(false);
         Line line = new Line(values).setColor(Color.BLUE).setCubic(true);
+        Line lineCursor = new Line(valuesCursor).setColor(Color.RED);
         List<Line> lines = new ArrayList<>();
+
         line.setHasPoints(false);
         line.setFilled(true);
         line.setCubic(true);
         lines.add(line);
+
+        lineCursor.setHasPoints(false);
+        lineCursor.setPointRadius(2);
+        lineCursor.setFilled(true);
+        lineCursor.setCubic(true);
+        lines.add(lineCursor);
 
         data = new LineChartData();
         data.setLines(lines);
@@ -102,6 +130,27 @@ public class VentilatorFragment extends Fragment {
 
         chart.setLineChartData(data);
         setHasOptionsMenu(true);
+
+        animationStop = AnimationUtils.loadAnimation(getContext(), R.anim.stop);
+        animationRotate = AnimationUtils.loadAnimation(getContext(), R.anim.rotate);
+        imageSearchBluetooth = getActivity().findViewById(R.id.ventiletorBluetooth);
+        animationRotate.setAnimationListener(new Animation.AnimationListener() {
+            @Override
+            public void onAnimationStart(Animation animation) {
+
+            }
+
+            @Override
+            public void onAnimationEnd(Animation animation) {
+                imageSearchBluetooth.startAnimation(animationRotate);
+            }
+
+            @Override
+            public void onAnimationRepeat(Animation animation) {
+
+            }
+        });
+
         return root;
     }
 
@@ -116,14 +165,10 @@ public class VentilatorFragment extends Fragment {
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
         if(id == R.id.ventiletorBluetooth){
+            imageSearchBluetooth = getActivity().findViewById(R.id.ventiletorBluetooth);
             tryConnect();
         }
-        if(id==R.id.playDevice){
 
-        }
-        if(id==R.id.pauseDevice){
-
-        }
         return super.onOptionsItemSelected(item);
     }
 
@@ -133,37 +178,50 @@ public class VentilatorFragment extends Fragment {
         if((bluetooth!=null)&&(bluetoothStatus))
         {
             if (bluetooth.isEnabled()) {
-                AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-                builder.setTitle("Choose an device:");
-                ArrayList<String> listOfDevices = new ArrayList<>();
-                Set<BluetoothDevice> pairedDevices = bluetooth.getBondedDevices();
-                if(pairedDevices.size()>0){
-                    for(BluetoothDevice device: pairedDevices)
-                    {
-                        listOfDevices.add(device.getName());
-                    }
-                }
-
-                builder.setItems(listOfDevices.toArray(new String[0]), new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        for(BluetoothDevice device: pairedDevices)
-                        {
-                            if(device.getName().equals(listOfDevices.get(which))){
-                                curDevice = device;
-                                ConnectThread connect = new ConnectThread(device, MY_UUID_INSECURE);
-                                connect.start();
-
-                                //byte[] bytik = new byte[]{(byte) 0x01};
-                                //mConnectedThread.write(bytik);
-                            }
+                if(visibleDevName.equals("no remember device")) {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+                    builder.setTitle("Choose an device:");
+                    ArrayList<String> listOfDevices = new ArrayList<>();
+                    Set<BluetoothDevice> pairedDevices = bluetooth.getBondedDevices();
+                    if (pairedDevices.size() > 0) {
+                        for (BluetoothDevice device : pairedDevices) {
+                            listOfDevices.add(device.getName());
                         }
                     }
-                });
-
-                AlertDialog dialog = builder.create();
-                dialog.show();
-                bluetoothStatus = false;
+                    builder.setItems(listOfDevices.toArray(new String[0]), new DialogInterface.OnClickListener() {
+                        @SuppressLint("RestrictedApi")
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            for (BluetoothDevice device : pairedDevices) {
+                                if (device.getName().equals(listOfDevices.get(which))) {
+                                    uiSearchBT();
+                                    curDevice = device;
+                                    visibleDevName = device.getName();
+                                    statusString.setText(visibleDevName);
+                                    saveText();
+                                    ParcelUuid[] uuids = device.getUuids();
+                                    ConnectThread connect = new ConnectThread(device, uuids[0].getUuid());
+                                    connect.start();
+                                    bluetoothStatus = false;
+                                }
+                            }
+                        }
+                    });
+                    AlertDialog dialog = builder.create();
+                    dialog.show();
+                }else{
+                    Set<BluetoothDevice> pairedDevices = bluetooth.getBondedDevices();
+                    for (BluetoothDevice device : pairedDevices) {
+                        if (device.getName().equals(visibleDevName)) {
+                            uiSearchBT();
+                            curDevice = device;
+                            ParcelUuid[] uuids = device.getUuids();
+                            ConnectThread connect = new ConnectThread(device, uuids[0].getUuid());
+                            connect.start();
+                            bluetoothStatus = false;
+                        }
+                    }
+                }
             }
             else
             {
@@ -171,6 +229,8 @@ public class VentilatorFragment extends Fragment {
                 startActivity(enableBtIntent);
             }
         }else{
+            byte[] bytes = {0x00, 0x01};
+            mConnectedThread.write(bytes);
             mConnectedThread.cancel();
             MenuItem menuItem = mOptionsMenu.findItem(R.id.ventiletorBluetooth);
             menuItem.setIcon(R.drawable.ic_baseline_bluetooth_disabled_24);
@@ -182,20 +242,20 @@ public class VentilatorFragment extends Fragment {
         private BluetoothSocket mmSocket;
 
         public ConnectThread(BluetoothDevice device, UUID uuid) {
-            Log.d(TAG, "ConnectThread: started.");
+          //  Log.d(TAG, "ConnectThread: started.");
             mmDevice = device;
-            //deviceUUID = uuid;
+            deviceUUID = uuid;
         }
 
         public void run(){
             BluetoothSocket tmp = null;
-            Log.i(TAG, "RUN mConnectThread ");
+           // Log.i(TAG, "RUN mConnectThread ");
             try {
-                Log.d(TAG, "ConnectThread: Trying to create InsecureRfcommSocket using UUID: "
-                        + MY_UUID_INSECURE );
-                tmp = mmDevice.createRfcommSocketToServiceRecord(MY_UUID_INSECURE);
+              //  Log.d(TAG, "ConnectThread: Trying to create InsecureRfcommSocket using UUID: "
+                     //   + deviceUUID);
+                tmp = mmDevice.createRfcommSocketToServiceRecord(deviceUUID);
             } catch (IOException e) {
-                Log.e(TAG, "ConnectThread: Could not create InsecureRfcommSocket " + e.getMessage());
+              //  Log.e(TAG, "ConnectThread: Could not create InsecureRfcommSocket " + e.getMessage());
             }
 
             mmSocket = tmp;
@@ -205,21 +265,21 @@ public class VentilatorFragment extends Fragment {
             } catch (IOException e) {
                 try {
                     mmSocket.close();
-                    Log.d(TAG, "run: Closed Socket.");
+                   // Log.d(TAG, "run: Closed Socket.");
                 } catch (IOException e1) {
-                    Log.e(TAG, "mConnectThread: run: Unable to close connection in socket " + e1.getMessage());
+                   // Log.e(TAG, "mConnectThread: run: Unable to close connection in socket " + e1.getMessage());
                 }
-                Log.d(TAG, "run: ConnectThread: Could not connect to UUID: " + MY_UUID_INSECURE );
+                //og.d(TAG, "run: ConnectThread: Could not connect to UUID: " + deviceUUID);
             }
             connected(mmSocket);
         }
 
         public void cancel() {
             try {
-                Log.d(TAG, "cancel: Closing Client Socket.");
+                //Log.d(TAG, "cancel: Closing Client Socket.");
                 mmSocket.close();
             } catch (IOException e) {
-                Log.e(TAG, "cancel: close() of mmSocket in Connectthread failed. " + e.getMessage());
+                //Log.e(TAG, "cancel: close() of mmSocket in Connectthread failed. " + e.getMessage());
             }
         }
     }
@@ -229,15 +289,6 @@ public class VentilatorFragment extends Fragment {
         mConnectedThread = new ConnectedThread(mmSocket);
         mConnectedThread.start();
         chart.setLineChartData(data);
-        getActivity().runOnUiThread(new Runnable() {
-            @SuppressLint({"RestrictedApi", "UseCompatLoadingForDrawables"})
-            @Override
-            public void run() {
-                MenuItem menuItem = mOptionsMenu.findItem(R.id.ventiletorBluetooth);
-                menuItem.setIcon(R.drawable.ic_baseline_bluetooth_connected_24);
-            }
-        });
-
     }
 
     private class ConnectedThread extends Thread {
@@ -264,6 +315,15 @@ public class VentilatorFragment extends Fragment {
         public void run(){
             byte[] buffer = new byte[1];
             int bytes;
+            getActivity().runOnUiThread(new Runnable() {
+                @SuppressLint({"RestrictedApi", "UseCompatLoadingForDrawables"})
+                @Override
+                public void run() {
+                    uiStartBT();
+                    byte[] bytes = {0x01, 0x01};
+                    write(bytes);
+                }
+            });
             while (true) {
                 try {
                     bytes = mmInStream.read(buffer);
@@ -281,7 +341,13 @@ public class VentilatorFragment extends Fragment {
 
                                 if ((values != null) && (values.size() > (amountOfPoints - 1))) {
                                     values.get(i-1).set(i, (float) buf);
+                                    valuesCursor.get(0).set(i, (float) buf);
                                 } else {
+                                    if(valuesCursor.size()==0){
+                                        valuesCursor.add(new PointValue(i, (float) buf));
+                                    }else{
+                                        valuesCursor.get(0).set(i, (float) buf);
+                                    }
                                     values.add(new PointValue(i, (float) buf));
                                 }
                                 chart.setLineChartData(data);
@@ -292,7 +358,14 @@ public class VentilatorFragment extends Fragment {
                         bufList.clear();
                     }
                 } catch (IOException e) {
-                    Log.e(TAG, "write: Error reading Input Stream. " + e.getMessage() );
+                    //Log.e(TAG, "write: Error reading Input Stream. " + e.getMessage() );
+                    getActivity().runOnUiThread(new Runnable() {
+                        @SuppressLint({"RestrictedApi", "UseCompatLoadingForDrawables"})
+                        @Override
+                        public void run() {
+                            uiStopBT();
+                        }
+                    });
                     break;
                 }
             }
@@ -300,21 +373,54 @@ public class VentilatorFragment extends Fragment {
 
         public void write(byte[] bytes) {
             String text = new String(bytes, Charset.defaultCharset());
-            Log.d(TAG, "write: Writing to outputstream: " + text);
+            //Log.d(TAG, "write: Writing to outputstream: " + text);
             try {
                 mmOutStream.write(bytes);
             } catch (IOException e) {
-                Log.e(TAG, "write: Error writing to output stream. " + e.getMessage() );
+                //Log.e(TAG, "write: Error writing to output stream. " + e.getMessage() );
             }
         }
-        /* Call this from the main activity to shutdown the connection */
+
         public void cancel() {
             try {
                 mmSocket.close();
-            } catch (IOException e) { }
+            } catch (IOException ignored) { }
         }
     }
 
+    @SuppressLint("RestrictedApi")
+    public void uiSearchBT(){
+        imageSearchBluetooth.setIcon(ContextCompat.getDrawable(requireContext(),R.drawable.ic_baseline_autorenew_24));
+        imageSearchBluetooth.startAnimation(animationRotate);
+    }
 
+    @SuppressLint({"RestrictedApi"})
+    public void uiStopBT(){
+        imageSearchBluetooth.setIcon(ContextCompat.getDrawable(requireContext(),R.drawable.ic_baseline_bluetooth_disabled_24));
+        imageSearchBluetooth.startAnimation(animationStop);
+        values.clear();
+        valuesCursor.clear();
+        i = 0;
+        j = 0;
+        chart.setLineChartData(data);
+    }
 
+    @SuppressLint({"RestrictedApi"})
+    public void uiStartBT(){
+        imageSearchBluetooth.setIcon(ContextCompat.getDrawable(requireContext(),R.drawable.ic_baseline_bluetooth_connected_24));
+        imageSearchBluetooth.startAnimation(animationStop);
+    }
+
+    void saveText() {
+        sPref = getActivity().getPreferences(MODE_PRIVATE);
+        SharedPreferences.Editor ed = sPref.edit();
+        ed.putString("BLUENAME", visibleDevName);
+        ed.commit();
+    }
+
+    void loadText() {
+        sPref = getActivity().getPreferences(MODE_PRIVATE);
+        String savedText = sPref.getString("BLUENAME", "no remember device");
+        visibleDevName = savedText;
+    }
 }
