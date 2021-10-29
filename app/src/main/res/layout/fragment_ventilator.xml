@@ -41,10 +41,24 @@
                     android:layout_height="3dp"
                     android:background="?android:attr/listDivider" />
 
-                <lecho.lib.hellocharts.view.LineChartView
-                    android:id="@+id/chart"
+                <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent" />
+                    android:layout_height="match_parent"
+                    android:orientation="vertical">
+
+                    <lecho.lib.hellocharts.view.LineChartView
+                        android:id="@+id/chartPressure"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1" />
+
+                    <lecho.lib.hellocharts.view.LineChartView
+                        android:id="@+id/chartFlow"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1" />
+                </LinearLayout>
+
             </LinearLayout>
 
         </FrameLayout>

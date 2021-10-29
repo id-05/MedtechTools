@@ -25,12 +25,11 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.view.menu.ActionMenuItemView;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
-import androidx.lifecycle.ViewModelProvider;
+
 import com.example.medtechtools.R;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -49,7 +48,7 @@ import static android.content.Context.MODE_PRIVATE;
 
 public class VentilatorFragment extends Fragment {
 
-    private VentilatorViewModel ventilatorViewModel;
+    //private VentilatorViewModel ventilatorViewModel;
     Animation animationRotate = null;
     Animation animationStop = null;
     BluetoothDevice curDevice;
@@ -58,13 +57,21 @@ public class VentilatorFragment extends Fragment {
     static String TAG = "medtechtools";
     boolean bluetoothStatus = true;
     private Menu mOptionsMenu;
-    LineChartView chart;
-    List<PointValue> values = new ArrayList<>();
-    List<PointValue> valuesCursor = new ArrayList<>();
-    LineChartData data;
+
+    LineChartView chartPressure;
+    List<PointValue> valuesPressure = new ArrayList<>();
+    List<PointValue> valuesPressureCursor = new ArrayList<>();
+    LineChartData dataPressure;
+
+    LineChartView chartFlow;
+    List<PointValue> valuesFlow = new ArrayList<>();
+    List<PointValue> valuesFlowCursor = new ArrayList<>();
+    LineChartData dataFlow;
+
     int i = 0;
     int j = 0;
-    int amountOfPoints = 120;
+    int pointsPressure = 2000;
+    int pointsFlow = 2000;
     ArrayList<Byte> bufList = new ArrayList<>();
     ActionMenuItemView imageSearchBluetooth;
     UUID deviceUUID;
@@ -74,61 +81,100 @@ public class VentilatorFragment extends Fragment {
 
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
-        ventilatorViewModel =
-                new ViewModelProvider(this).get(VentilatorViewModel.class);
+        //ventilatorViewModel = new ViewModelProvider(this).get(VentilatorViewModel.class);
         View root = inflater.inflate(R.layout.fragment_ventilator, container, false);
 
         statusString = root.findViewById(R.id.statusString);
         loadText();
         statusString.setText(visibleDevName);
 
-        chart = root.findViewById(R.id.chart);
-        chart.setInteractive(true);
-        chart.setZoomType(ZoomType.HORIZONTAL_AND_VERTICAL);
-        chart.setFocusable(false);
+        chartPressure = root.findViewById(R.id.chartPressure);
+        chartPressure.setInteractive(true);
+        chartPressure.setZoomType(ZoomType.HORIZONTAL_AND_VERTICAL);
+        chartPressure.setFocusable(false);
 
-        final Viewport v = new Viewport(chart.getMaximumViewport());
-        v.bottom = 0;
-        v.top = 4;
-        v.left = 0;
-        v.right = amountOfPoints;
-        chart.setMaximumViewport(v);
-        chart.setCurrentViewport(v);
-        chart.setViewportCalculationEnabled(false);
-        Line line = new Line(values).setColor(Color.BLUE).setCubic(true);
-        Line lineCursor = new Line(valuesCursor).setColor(Color.RED);
-        List<Line> lines = new ArrayList<>();
+        chartFlow = root.findViewById(R.id.chartFlow);
+        chartFlow.setInteractive(true);
+        chartFlow.setZoomType(ZoomType.HORIZONTAL_AND_VERTICAL);
+        chartFlow.setFocusable(false);
 
-        line.setHasPoints(false);
-        line.setFilled(true);
-        line.setCubic(true);
-        lines.add(line);
+        final Viewport vP = new Viewport(chartPressure.getMaximumViewport());
+        vP.bottom = 0;
+        vP.top = 4;
+        vP.left = 0;
+        vP.right = pointsPressure;
+        chartPressure.setMaximumViewport(vP);
+        chartPressure.setCurrentViewport(vP);
+        chartPressure.setViewportCalculationEnabled(false);
 
-        lineCursor.setHasPoints(false);
-        lineCursor.setPointRadius(2);
-        lineCursor.setFilled(true);
-        lineCursor.setCubic(true);
-        lines.add(lineCursor);
+        final Viewport vF = new Viewport(chartFlow.getMaximumViewport());
+        vF.bottom = 0;
+        vF.top = 4;
+        vF.left = 0;
+        vF.right = pointsFlow;
+        chartFlow.setMaximumViewport(vF);
+        chartFlow.setCurrentViewport(vF);
+        chartFlow.setViewportCalculationEnabled(false);
 
-        data = new LineChartData();
-        data.setLines(lines);
+        Line linePressure = new Line(valuesPressure).setColor(Color.GRAY);//.setCubic(true);
+        Line linePressureCursor = new Line(valuesPressureCursor).setColor(Color.YELLOW);
+        List<Line> linesPressure = new ArrayList<>();
+        linePressure.setHasPoints(false);
+        linePressure.setFilled(true);
+        linesPressure.add(linePressure);
+        linePressureCursor.setHasPoints(false);
+        linePressureCursor.setPointRadius(2);
+        linePressureCursor.setFilled(true);
+        linesPressure.add(linePressureCursor);
+        dataPressure = new LineChartData();
+        dataPressure.setLines(linesPressure);
 
-        List<AxisValue> axisValuesForY = new ArrayList<>();
-        AxisValue tempAxisValue;
+        Line lineFlow = new Line(valuesFlow).setColor(Color.GRAY);//.setCubic(true);
+        Line lineFlowCursor = new Line(valuesFlowCursor).setColor(Color.YELLOW);
+        List<Line> linesFlow = new ArrayList<>();
+        lineFlow.setHasPoints(false);
+        lineFlow.setFilled(true);
+        linesFlow.add(lineFlow);
+        lineFlowCursor.setHasPoints(false);
+        lineFlowCursor.setPointRadius(2);
+        lineFlowCursor.setFilled(true);
+        linesFlow.add(lineFlowCursor);
+        dataFlow = new LineChartData();
+        dataFlow.setLines(linesFlow);
+
+        List<AxisValue> axisValuesForYP = new ArrayList<>();
+        AxisValue tempAxisValueP;
         for (float i = 0; i <= 4; i +=1){
-            tempAxisValue = new AxisValue(i);
-            tempAxisValue.setLabel(i+"");
-            axisValuesForY.add(tempAxisValue);
+            tempAxisValueP = new AxisValue(i);
+            tempAxisValueP.setLabel(i+"");
+            axisValuesForYP.add(tempAxisValueP);
         }
-        Axis axisX = new Axis ();
-        axisX.setName("t");
-        Axis axisY = new Axis (axisValuesForY);
-        axisY.setName("U");
-        axisY.setAutoGenerated(false);
-        data.setAxisXBottom(axisX);
-        data.setAxisYLeft(axisY);
+        Axis axisXP = new Axis ();
+        axisXP.setName("t");
+        Axis axisYP = new Axis (axisValuesForYP);
+        axisYP.setName("Pressure");
+        axisYP.setAutoGenerated(false);
+        dataPressure.setAxisXBottom(axisXP);
+        dataPressure.setAxisYLeft(axisYP);
 
-        chart.setLineChartData(data);
+        List<AxisValue> axisValuesForYF = new ArrayList<>();
+        AxisValue tempAxisValueF;
+        for (float i = 0; i <= 4; i +=1){
+            tempAxisValueF = new AxisValue(i);
+            tempAxisValueF.setLabel(i+"");
+            axisValuesForYF.add(tempAxisValueF);
+        }
+        Axis axisXF = new Axis ();
+        axisXF.setName("t");
+        Axis axisYF = new Axis (axisValuesForYF);
+        axisYF.setName("Flow");
+        axisYF.setAutoGenerated(false);
+        dataFlow.setAxisXBottom(axisXF);
+        dataFlow.setAxisYLeft(axisYF);
+
+        chartPressure.setLineChartData(dataPressure);
+        chartFlow.setLineChartData(dataFlow);
+
         setHasOptionsMenu(true);
 
         animationStop = AnimationUtils.loadAnimation(getContext(), R.anim.stop);
@@ -229,7 +275,7 @@ public class VentilatorFragment extends Fragment {
                 startActivity(enableBtIntent);
             }
         }else{
-            byte[] bytes = {0x00, 0x01};
+            byte[] bytes = {0x00, 0x00};
             mConnectedThread.write(bytes);
             mConnectedThread.cancel();
             MenuItem menuItem = mOptionsMenu.findItem(R.id.ventiletorBluetooth);
@@ -288,7 +334,8 @@ public class VentilatorFragment extends Fragment {
         Log.d(TAG, "connected: Starting.");
         mConnectedThread = new ConnectedThread(mmSocket);
         mConnectedThread.start();
-        chart.setLineChartData(data);
+        chartPressure.setLineChartData(dataPressure);
+        chartFlow.setLineChartData(dataPressure);
     }
 
     private class ConnectedThread extends Thread {
@@ -331,26 +378,42 @@ public class VentilatorFragment extends Fragment {
                     j++;
                     if(j==6)
                     {
-                        if (i == amountOfPoints) {
+                        if (i == pointsPressure) {
                             i = 0;
                         }
-                        double buf = (((( bufList.get(0) & 0xff ) << 8)) | ( bufList.get(1) & 0xff )) * 0.000805;
+                        double valuePress = (((( bufList.get(0) & 0xff ) << 8)) | ( bufList.get(1) & 0xff )) * 0.000805;
+                        double valueFlow = (((( bufList.get(2) & 0xff ) << 8)) | ( bufList.get(3) & 0xff )) * 0.000805;
                         getActivity().runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
 
-                                if ((values != null) && (values.size() > (amountOfPoints - 1))) {
-                                    values.get(i-1).set(i, (float) buf);
-                                    valuesCursor.get(0).set(i, (float) buf);
+                                if ((valuesPressure != null) && (valuesPressure.size() > (pointsPressure - 1))) {
+                                    valuesPressure.get(i-1).set(i, (float) valuePress);
+                                   // Log.d(TAG,"i = "+i);
+                                    valuesPressureCursor.get(0).set(i, (float) valuePress);
                                 } else {
-                                    if(valuesCursor.size()==0){
-                                        valuesCursor.add(new PointValue(i, (float) buf));
+                                    if(valuesPressureCursor.size()==0){
+                                        valuesPressureCursor.add(new PointValue(i, (float) valuePress));
                                     }else{
-                                        valuesCursor.get(0).set(i, (float) buf);
+                                        valuesPressureCursor.get(0).set(i, (float) valuePress);
                                     }
-                                    values.add(new PointValue(i, (float) buf));
+                                    valuesPressure.add(new PointValue(i, (float) valuePress));
                                 }
-                                chart.setLineChartData(data);
+                                chartPressure.setLineChartData(dataPressure);
+
+                                if ((valuesFlow != null) && (valuesFlow.size() > (pointsFlow - 1))) {
+                                    valuesFlow.get(i-1).set(i, (float) valueFlow);
+                                  //  Log.d(TAG,"i = "+i);
+                                    valuesFlowCursor.get(0).set(i, (float) valueFlow);
+                                } else {
+                                    if(valuesFlowCursor.size()==0){
+                                        valuesFlowCursor.add(new PointValue(i, (float) valueFlow));
+                                    }else{
+                                        valuesFlowCursor.get(0).set(i, (float) valueFlow);
+                                    }
+                                    valuesFlow.add(new PointValue(i, (float) valueFlow));
+                                }
+                                chartFlow.setLineChartData(dataFlow);
                             }
                         });
                         i++;
@@ -372,7 +435,7 @@ public class VentilatorFragment extends Fragment {
         }
 
         public void write(byte[] bytes) {
-            String text = new String(bytes, Charset.defaultCharset());
+            //String text = new String(bytes, Charset.defaultCharset());
             //Log.d(TAG, "write: Writing to outputstream: " + text);
             try {
                 mmOutStream.write(bytes);
@@ -398,11 +461,15 @@ public class VentilatorFragment extends Fragment {
     public void uiStopBT(){
         imageSearchBluetooth.setIcon(ContextCompat.getDrawable(requireContext(),R.drawable.ic_baseline_bluetooth_disabled_24));
         imageSearchBluetooth.startAnimation(animationStop);
-        values.clear();
-        valuesCursor.clear();
+        valuesPressure.clear();
+        valuesPressureCursor.clear();
         i = 0;
         j = 0;
-        chart.setLineChartData(data);
+        chartPressure.setLineChartData(dataPressure);
+
+        valuesFlow.clear();
+        valuesFlowCursor.clear();
+        chartFlow.setLineChartData(dataFlow);
     }
 
     @SuppressLint({"RestrictedApi"})
