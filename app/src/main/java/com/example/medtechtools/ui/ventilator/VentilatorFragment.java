@@ -47,6 +47,7 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.Timer;
+import java.util.TimerTask;
 import java.util.UUID;
 
 import static android.content.Context.MODE_PRIVATE;
@@ -67,6 +68,7 @@ public class VentilatorFragment extends Fragment {
 
     int i = 0;
     int j = 0;
+    int deltaT = 15;
     int pointsPressure = 12000;
     int pointsFlow = 12000;
     int countVisiblePoints = 2000;
@@ -81,7 +83,7 @@ public class VentilatorFragment extends Fragment {
     ArrayList<Entry> valuesPres = new ArrayList<>();
     ArrayList<Entry> valuesFlow = new ArrayList<>();
     LineData dataPres, dataFlow;
-
+    public TextView Ppeak, PEEP, Volume, mVolume, FREQ;
     Timer timer = new Timer();
 
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -125,6 +127,12 @@ public class VentilatorFragment extends Fragment {
 
             }
         });
+
+        Ppeak = root.findViewById(R.id.ppeak);
+        PEEP = root.findViewById(R.id.peep);
+        Volume = root.findViewById(R.id.volume);
+        mVolume = root.findViewById(R.id.mvolume);
+        FREQ = root.findViewById(R.id.freq);
 
         return root;
     }
@@ -328,6 +336,91 @@ public class VentilatorFragment extends Fragment {
         //Log.d(TAG, "connected: Starting.");
         mConnectedThread = new ConnectedThread(mmSocket);
         mConnectedThread.start();
+        timer.schedule(new UpdateParametrs(), 15*1000, 15*1000);
+    }
+
+    class UpdateParametrs extends TimerTask {
+        public void run() {
+            getActivity().runOnUiThread(new Runnable() {
+                @SuppressLint({"SetTextI18n", "DefaultLocale"})
+                @Override
+                public void run() {
+                    float pPeak = 0f;
+                    for(Entry bufEntry:valuesPres){
+                            if(bufEntry.getY()>pPeak){
+                                pPeak = bufEntry.getY();
+                            }
+                    }
+                    float peep = pPeak;
+                    for(Entry bufEntry:valuesPres){
+                        if(bufEntry.getY()<peep){
+                            peep = bufEntry.getY();
+                        }
+                    }
+                    boolean changeMinusToPlus = false;
+                    boolean changePlusToMinus = false;
+                    float sum = 0;
+                    float bufValue = 0;
+                    int startN = 0;
+                    int stopN = 0;
+                    int j = 0;
+                    int k = 0;
+                    int l =0;
+                    float resultVolume = 0;
+
+                    for(Entry bufEntry:valuesFlow){
+                        if((bufEntry.getY()>0)&&(bufValue<=0)){
+                            startN = k;
+                        }
+                        if((bufEntry.getY()<0)&&(bufValue>0)){
+                            stopN = k;
+                        }
+                        if((bufEntry.getY()>0)&&(stopN<startN)){
+                            sum = sum + (float)bufEntry.getY();
+                            j++;
+                        }
+                        if(stopN>startN){
+                            resultVolume = (stopN-startN)*(sum)/j ;
+                            sum = 0;
+                            j = 0;
+                            stopN = 0;
+                            startN = 0;
+                        }
+                        if(bufEntry.getY()!=0){
+                            bufValue = bufEntry.getY();
+                        }
+                        k++;
+                    }
+
+                    float max1 = 0;
+                    int point1 = 0;
+                    int point2 = 0;
+                    int m = 0;
+                    boolean detectpick = false;
+                    ArrayList<Entry> listMax = new ArrayList<>();
+                    for(Entry bufEntry:valuesFlow){
+                        if(bufEntry.getY()>max1){
+                            detectpick = true;
+                        }else{
+                            if(detectpick){
+                                listMax.add(bufEntry);
+                                detectpick = false;
+                            }
+                        }
+                    }
+                    float frequency = 0;
+                    if(listMax.size()>1) {
+                        frequency = 60000 / (deltaT * (listMax.get(1).getX() - listMax.get(0).getX()));
+                    }
+                    listMax.clear();
+                    Ppeak.setText(String.format("%.2f",pPeak));
+                    PEEP.setText(String.format("%.2f",peep));
+                    Volume.setText(String.format("%.0f",resultVolume));
+                    FREQ.setText(String.format("%.0f",frequency));
+                }
+            });
+
+        }
     }
 
     private class ConnectedThread extends Thread {

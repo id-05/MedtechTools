@@ -102,7 +102,7 @@
                                     android:layout_height="wrap_content"
                                     android:layout_weight="5"
                                     android:gravity="center"
-                                    android:text="00.0"
+                                    android:text="@string/startValue"
                                     android:textSize="36sp" />
 
                                 <TextView
@@ -111,7 +111,7 @@
                                     android:layout_height="wrap_content"
                                     android:layout_weight="1"
                                     android:gravity="center"
-                                    android:text="Ppeak" />
+                                    android:text="@string/ppeak" />
                             </LinearLayout>
                         </FrameLayout>
 
@@ -133,7 +133,7 @@
                                     android:layout_height="wrap_content"
                                     android:layout_weight="5"
                                     android:gravity="center"
-                                    android:text="00.0"
+                                    android:text="@string/startValue"
                                     android:textSize="36sp" />
 
                                 <TextView
@@ -142,7 +142,7 @@
                                     android:layout_height="wrap_content"
                                     android:layout_weight="1"
                                     android:gravity="center"
-                                    android:text="PEEP" />
+                                    android:text="@string/peep" />
                             </LinearLayout>
                         </FrameLayout>
 
@@ -180,7 +180,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="5"
                                 android:gravity="center"
-                                android:text="00.0"
+                                android:text="@string/startValue"
                                 android:textSize="36sp" />
 
                             <TextView
@@ -189,7 +189,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:gravity="center"
-                                android:text="VOLUME" />
+                                android:text="@string/volume" />
                         </LinearLayout>
                     </FrameLayout>
 
@@ -211,7 +211,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="5"
                                 android:gravity="center"
-                                android:text="00.0"
+                                android:text="@string/startValue"
                                 android:textSize="36sp" />
 
                             <TextView
@@ -220,7 +220,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:gravity="center"
-                                android:text="MVE" />
+                                android:text="@string/mve" />
                         </LinearLayout>
                     </FrameLayout>
 
@@ -242,7 +242,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="5"
                                 android:gravity="center"
-                                android:text="00.0"
+                                android:text="@string/startValue"
                                 android:textSize="36sp" />
 
                             <TextView
@@ -251,7 +251,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:gravity="center"
-                                android:text="FREQ" />
+                                android:text="@string/freq" />
                         </LinearLayout>
                     </FrameLayout>
 
