@@ -9,6 +9,8 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.DashPathEffect;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.ParcelUuid;
 import android.util.Log;
@@ -27,22 +29,25 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.example.medtechtools.R;
+import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.components.Legend;
+import com.github.mikephil.charting.components.XAxis;
+import com.github.mikephil.charting.components.YAxis;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.data.LineData;
+import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.formatter.IFillFormatter;
+import com.github.mikephil.charting.interfaces.dataprovider.LineDataProvider;
+import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
+import com.github.mikephil.charting.utils.Utils;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
+import java.util.Timer;
 import java.util.UUID;
-
-import lecho.lib.hellocharts.gesture.ZoomType;
-import lecho.lib.hellocharts.model.Axis;
-import lecho.lib.hellocharts.model.AxisValue;
-import lecho.lib.hellocharts.model.Line;
-import lecho.lib.hellocharts.model.LineChartData;
-import lecho.lib.hellocharts.model.PointValue;
-import lecho.lib.hellocharts.model.Viewport;
-import lecho.lib.hellocharts.view.LineChartView;
 
 import static android.content.Context.MODE_PRIVATE;
 
@@ -57,27 +62,27 @@ public class VentilatorFragment extends Fragment {
     static String TAG = "medtechtools";
     boolean bluetoothStatus = true;
     private Menu mOptionsMenu;
-
-    LineChartView chartPressure;
-    List<PointValue> valuesPressure = new ArrayList<>();
-    List<PointValue> valuesPressureCursor = new ArrayList<>();
-    LineChartData dataPressure;
-
-    LineChartView chartFlow;
-    List<PointValue> valuesFlow = new ArrayList<>();
-    List<PointValue> valuesFlowCursor = new ArrayList<>();
-    LineChartData dataFlow;
+    LineChart chartPres;
+    LineChart chartFlow;
 
     int i = 0;
     int j = 0;
-    int pointsPressure = 2000;
-    int pointsFlow = 2000;
+    int pointsPressure = 12000;
+    int pointsFlow = 12000;
+    int countVisiblePoints = 2000;
     ArrayList<Byte> bufList = new ArrayList<>();
     ActionMenuItemView imageSearchBluetooth;
     UUID deviceUUID;
     SharedPreferences sPref;
     TextView statusString;
     String visibleDevName;
+    LineDataSet set;//Pres;
+    LineDataSet setFlow;
+    ArrayList<Entry> valuesPres = new ArrayList<>();
+    ArrayList<Entry> valuesFlow = new ArrayList<>();
+    LineData dataPres, dataFlow;
+
+    Timer timer = new Timer();
 
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
@@ -88,92 +93,16 @@ public class VentilatorFragment extends Fragment {
         loadText();
         statusString.setText(visibleDevName);
 
-        chartPressure = root.findViewById(R.id.chartPressure);
-        chartPressure.setInteractive(true);
-        chartPressure.setZoomType(ZoomType.HORIZONTAL_AND_VERTICAL);
-        chartPressure.setFocusable(false);
+        chartPres = root.findViewById(R.id.chartPres);
+        prepareChat(chartPres, dataPres, valuesPres,0,pointsPressure,0,4);
+        chartPres.notifyDataSetChanged();
+        chartPres.invalidate();
 
+        ///////////////////////////////////////////
         chartFlow = root.findViewById(R.id.chartFlow);
-        chartFlow.setInteractive(true);
-        chartFlow.setZoomType(ZoomType.HORIZONTAL_AND_VERTICAL);
-        chartFlow.setFocusable(false);
-
-        final Viewport vP = new Viewport(chartPressure.getMaximumViewport());
-        vP.bottom = 0;
-        vP.top = 4;
-        vP.left = 0;
-        vP.right = pointsPressure;
-        chartPressure.setMaximumViewport(vP);
-        chartPressure.setCurrentViewport(vP);
-        chartPressure.setViewportCalculationEnabled(false);
-
-        final Viewport vF = new Viewport(chartFlow.getMaximumViewport());
-        vF.bottom = 0;
-        vF.top = 4;
-        vF.left = 0;
-        vF.right = pointsFlow;
-        chartFlow.setMaximumViewport(vF);
-        chartFlow.setCurrentViewport(vF);
-        chartFlow.setViewportCalculationEnabled(false);
-
-        Line linePressure = new Line(valuesPressure).setColor(Color.GRAY);//.setCubic(true);
-        Line linePressureCursor = new Line(valuesPressureCursor).setColor(Color.YELLOW);
-        List<Line> linesPressure = new ArrayList<>();
-        linePressure.setHasPoints(false);
-        linePressure.setFilled(true);
-        linesPressure.add(linePressure);
-        linePressureCursor.setHasPoints(false);
-        linePressureCursor.setPointRadius(2);
-        linePressureCursor.setFilled(true);
-        linesPressure.add(linePressureCursor);
-        dataPressure = new LineChartData();
-        dataPressure.setLines(linesPressure);
-
-        Line lineFlow = new Line(valuesFlow).setColor(Color.GRAY);//.setCubic(true);
-        Line lineFlowCursor = new Line(valuesFlowCursor).setColor(Color.YELLOW);
-        List<Line> linesFlow = new ArrayList<>();
-        lineFlow.setHasPoints(false);
-        lineFlow.setFilled(true);
-        linesFlow.add(lineFlow);
-        lineFlowCursor.setHasPoints(false);
-        lineFlowCursor.setPointRadius(2);
-        lineFlowCursor.setFilled(true);
-        linesFlow.add(lineFlowCursor);
-        dataFlow = new LineChartData();
-        dataFlow.setLines(linesFlow);
-
-        List<AxisValue> axisValuesForYP = new ArrayList<>();
-        AxisValue tempAxisValueP;
-        for (float i = 0; i <= 4; i +=1){
-            tempAxisValueP = new AxisValue(i);
-            tempAxisValueP.setLabel(i+"");
-            axisValuesForYP.add(tempAxisValueP);
-        }
-        Axis axisXP = new Axis ();
-        axisXP.setName("t");
-        Axis axisYP = new Axis (axisValuesForYP);
-        axisYP.setName("Pressure");
-        axisYP.setAutoGenerated(false);
-        dataPressure.setAxisXBottom(axisXP);
-        dataPressure.setAxisYLeft(axisYP);
-
-        List<AxisValue> axisValuesForYF = new ArrayList<>();
-        AxisValue tempAxisValueF;
-        for (float i = 0; i <= 4; i +=1){
-            tempAxisValueF = new AxisValue(i);
-            tempAxisValueF.setLabel(i+"");
-            axisValuesForYF.add(tempAxisValueF);
-        }
-        Axis axisXF = new Axis ();
-        axisXF.setName("t");
-        Axis axisYF = new Axis (axisValuesForYF);
-        axisYF.setName("Flow");
-        axisYF.setAutoGenerated(false);
-        dataFlow.setAxisXBottom(axisXF);
-        dataFlow.setAxisYLeft(axisYF);
-
-        chartPressure.setLineChartData(dataPressure);
-        chartFlow.setLineChartData(dataFlow);
+        prepareChat(chartFlow, dataFlow, valuesFlow,0,pointsFlow,-2,2);
+        chartFlow.notifyDataSetChanged();
+        chartFlow.invalidate();
 
         setHasOptionsMenu(true);
 
@@ -198,6 +127,71 @@ public class VentilatorFragment extends Fragment {
         });
 
         return root;
+    }
+
+    public void prepareChat(LineChart chart, LineData data, ArrayList<Entry> values, float xmin, float xmax, float ymin, float ymax){
+        chart.setBackgroundColor(Color.WHITE);
+        chart.getDescription().setEnabled(false);
+        chart.setTouchEnabled(true);
+        chart.setDrawGridBackground(false);
+        chart.setDragEnabled(true);
+        chart.setScaleEnabled(true);
+        chart.setPinchZoom(true);
+
+        Legend l = chart.getLegend();
+        l.setForm(Legend.LegendForm.NONE);
+
+        XAxis xAxisPres;
+        xAxisPres = chart.getXAxis();
+        xAxisPres.setAxisMaximum(xmax);
+        xAxisPres.setAxisMinimum(xmin);
+        xAxisPres.enableGridDashedLine(10f, 10f, 0f);
+
+        YAxis yAxisPres;
+        yAxisPres = chart.getAxisLeft();
+        chart.getAxisRight().setEnabled(false);
+        yAxisPres.enableGridDashedLine(10f, 10f, 0f);
+        yAxisPres.setAxisMaximum(ymax);
+        yAxisPres.setAxisMinimum(ymin);
+
+        set = new LineDataSet(values,null);
+        set.setDrawIcons(false);
+        set.setColor(Color.BLACK);
+        set.setCircleColor(Color.BLACK);
+        set.setLineWidth(1f);
+        set.setDrawCircles(false);
+        set.setDrawValues(false);
+        set.setFormLineWidth(1f);
+        set.setFormLineDashEffect(new DashPathEffect(new float[]{10f, 5f}, 0f));
+        set.setFormSize(15.f);
+        set.setValueTextSize(9f);
+        set.enableDashedHighlightLine(10f, 5f, 0f);
+        set.setDrawFilled(true);
+        set.setMode(LineDataSet.Mode.CUBIC_BEZIER);
+        set.setFillFormatter(new IFillFormatter() {
+            @Override
+            public float getFillLinePosition(ILineDataSet dataSet, LineDataProvider dataProvider) {
+                return chart.getAxisLeft().getAxisMinimum();
+            }
+        });
+
+        if (Utils.getSDKInt() >= 18) {
+            Drawable drawable = ContextCompat.getDrawable(getContext(), R.drawable.fade_color);
+            set.setFillDrawable(drawable);
+        } else {
+            set.setFillColor(Color.BLACK);
+        }
+
+        ArrayList<ILineDataSet> dataSets = new ArrayList<>();
+        dataSets.add(set);
+        data = new LineData(dataSets);
+        chart.setData(data);
+        set.setValues(values);
+        set.notifyDataSetChanged();
+        chart.getData().notifyDataChanged();
+
+        chart.setVisibleXRangeMaximum(countVisiblePoints);
+        chart.moveViewToX(data.getEntryCount());
     }
 
     @Override
@@ -331,11 +325,9 @@ public class VentilatorFragment extends Fragment {
     }
 
     private void connected(BluetoothSocket mmSocket) {
-        Log.d(TAG, "connected: Starting.");
+        //Log.d(TAG, "connected: Starting.");
         mConnectedThread = new ConnectedThread(mmSocket);
         mConnectedThread.start();
-        chartPressure.setLineChartData(dataPressure);
-        chartFlow.setLineChartData(dataPressure);
     }
 
     private class ConnectedThread extends Thread {
@@ -343,7 +335,7 @@ public class VentilatorFragment extends Fragment {
         private final InputStream mmInStream;
         private final OutputStream mmOutStream;
         public ConnectedThread(BluetoothSocket socket) {
-            Log.d(TAG, "ConnectedThread: Starting.");
+            //Log.d(TAG, "ConnectedThread: Starting.");
 
             mmSocket = socket;
             InputStream tmpIn = null;
@@ -381,39 +373,41 @@ public class VentilatorFragment extends Fragment {
                         if (i == pointsPressure) {
                             i = 0;
                         }
-                        double valuePress = (((( bufList.get(0) & 0xff ) << 8)) | ( bufList.get(1) & 0xff )) * 0.000805;
-                        double valueFlow = (((( bufList.get(2) & 0xff ) << 8)) | ( bufList.get(3) & 0xff )) * 0.000805;
+                        double valuePres = (((( bufList.get(0) & 0xff ) << 8)) | ( bufList.get(1) & 0xff )) * 0.000805;
+                        double valueFlow = (((( bufList.get(2) ) << 8)) | ( bufList.get(3) & 0xff )) * 0.000805;
                         getActivity().runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
 
-                                if ((valuesPressure != null) && (valuesPressure.size() > (pointsPressure - 1))) {
-                                    valuesPressure.get(i-1).set(i, (float) valuePress);
-                                   // Log.d(TAG,"i = "+i);
-                                    valuesPressureCursor.get(0).set(i, (float) valuePress);
-                                } else {
-                                    if(valuesPressureCursor.size()==0){
-                                        valuesPressureCursor.add(new PointValue(i, (float) valuePress));
-                                    }else{
-                                        valuesPressureCursor.get(0).set(i, (float) valuePress);
-                                    }
-                                    valuesPressure.add(new PointValue(i, (float) valuePress));
+                                if (valuesPres.size() > pointsPressure - 1 ) {
+                                    valuesPres.clear();
+                                    chartPres.moveViewToX(1);
+                                }else {
+                                    valuesPres.add(new Entry(i,(float)valuePres));
+                                    chartPres.invalidate();
                                 }
-                                chartPressure.setLineChartData(dataPressure);
 
-                                if ((valuesFlow != null) && (valuesFlow.size() > (pointsFlow - 1))) {
-                                    valuesFlow.get(i-1).set(i, (float) valueFlow);
-                                  //  Log.d(TAG,"i = "+i);
-                                    valuesFlowCursor.get(0).set(i, (float) valueFlow);
-                                } else {
-                                    if(valuesFlowCursor.size()==0){
-                                        valuesFlowCursor.add(new PointValue(i, (float) valueFlow));
-                                    }else{
-                                        valuesFlowCursor.get(0).set(i, (float) valueFlow);
-                                    }
-                                    valuesFlow.add(new PointValue(i, (float) valueFlow));
+                                if(i>countVisiblePoints){
+                                    chartPres.notifyDataSetChanged();
+                                    chartPres.setVisibleXRangeMaximum(countVisiblePoints);
+                                    chartPres.moveViewToX(i-countVisiblePoints);
+                                    chartPres.invalidate();
                                 }
-                                chartFlow.setLineChartData(dataFlow);
+
+                                if (valuesFlow.size() > pointsFlow - 1 ) {
+                                    valuesFlow.clear();
+                                    chartFlow.moveViewToX(1);
+                                }else {
+                                    valuesFlow.add(new Entry(i,(float)valueFlow));
+                                    chartFlow.invalidate();
+                                }
+
+                                if(i>countVisiblePoints){
+                                    chartFlow.notifyDataSetChanged();
+                                    chartFlow.setVisibleXRangeMaximum(countVisiblePoints);
+                                    chartFlow.moveViewToX(i-countVisiblePoints);
+                                    chartFlow.invalidate();
+                                }
                             }
                         });
                         i++;
@@ -461,15 +455,15 @@ public class VentilatorFragment extends Fragment {
     public void uiStopBT(){
         imageSearchBluetooth.setIcon(ContextCompat.getDrawable(requireContext(),R.drawable.ic_baseline_bluetooth_disabled_24));
         imageSearchBluetooth.startAnimation(animationStop);
-        valuesPressure.clear();
-        valuesPressureCursor.clear();
+
         i = 0;
         j = 0;
-        chartPressure.setLineChartData(dataPressure);
+
+        valuesPres.clear();
+        chartPres.invalidate();
 
         valuesFlow.clear();
-        valuesFlowCursor.clear();
-        chartFlow.setLineChartData(dataFlow);
+        chartFlow.invalidate();
     }
 
     @SuppressLint({"RestrictedApi"})
